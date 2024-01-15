@@ -1,0 +1,14 @@
+name: banditsoss
+channels:
+  - nodefaults
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas>2
+  - jupyterlab
+  - joblib
+  - pip
+  - pip:
+    - seaborn
+    - -e .
