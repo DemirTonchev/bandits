@@ -31,14 +31,9 @@ def check_random_state(seed=None):
                          ' numpy.random.Generator instance')
     
     
-def bernuolli(p: float, size=None, seed=base_rng):
+def bernuolli(p: float, seed=base_rng, *, size=None):
     rng = check_random_state(seed)
     return rng.binomial(1, p, size)
-
-def constant_dist(constant: float, size=None, seed=None):
-    """dummy RV(random variable) object that simulates "constant distribution" i.e. always returns constant
-    """
-    return constant
 
 
 def random_argmax(vector, seed=base_rng, **kwargs):
