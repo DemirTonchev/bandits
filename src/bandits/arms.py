@@ -101,7 +101,6 @@ class BaseArmWrapper:
         self._wrapped.mean = new_mean
     
     def pull(self, new_mean, size=None):
-        # self.wrapped.mean = self.transform_fn(new_mean)
         self._wrapped.mean = self.transform_fn(new_mean)
         return self._wrapped.pull(size=size)
     
@@ -128,12 +127,22 @@ class SimpleLinearArm(ContextualBaseArm):
         super().__init__(seed=seed)
         
         self.theta = np.asarray(theta)
-        self.base_arm = BaseArmWrapper( ConstantArm(None) if base_arm is None else base_arm )
+        if (base_arm is None) or isinstance(base_arm, BaseArm):
+            self.base_arm = BaseArmWrapper( ConstantArm(None) if base_arm is None else base_arm )
+        elif isinstance(base_arm, BaseArmWrapper):
+            self.base_arm = base_arm
+        else:
+            raise TypeError("Param base_arm should be one of None, BaseArm or BaseArmWrapper")
 
         self.dimension = self.theta.shape[0]
-        self.current_mean = None
+        
+        self.current_linear_mean = None
 
-
+    # for legacy reasons 
+    @property
+    def current_mean(self):
+        return self.get_current_arm_mean()
+    
     @property    
     def norm(self):
         return np.linalg.norm(self.theta)
@@ -141,15 +150,16 @@ class SimpleLinearArm(ContextualBaseArm):
 
     def pull(self, context_vector: Vector1d, size=None) -> float:
         context_vector = np.asarray(context_vector)
-        self.current_mean = np.dot(self.theta, context_vector)
-        self.reward = self.base_arm.pull(self.current_mean, size=size)
+        self.current_linear_mean = np.dot(self.theta, context_vector)
+        self.reward = self.base_arm.pull(self.current_linear_mean, size=size)
         return self.reward
 
 
-    def get_current_mean(self, context_vector: Optional[Vector1d] = None):
-        if context_vector is not None:
-            return np.dot(self.theta, context_vector)
-        return self.current_mean
+    def get_current_arm_mean(self):
+        return self.base_arm.mean
+    
+    def dot_context(self, context_vector: Vector1d):
+        return np.dot(self.theta, np.asarray(context_vector))
 
 
     def __repr__(self):
@@ -163,21 +173,21 @@ class BernulliLinearArm(SimpleLinearArm):
     """
 
     def __init__(self, theta: Vector1d, seed=None):
-        super().__init__(theta, None, seed=seed)
-        self.base_arm = BaseArmWrapper( BernulliArm(None), transform_fn=sigmoid)
+        super().__init__(
+            theta,
+            base_arm=BaseArmWrapper(
+                BernulliArm(None),
+                transform_fn=sigmoid
+                ),
+            seed=seed
+            )
 
 
     def pull(self, context_vector: Vector1d, size=None):
         """generetate random reward with fixed p
         """
         context_vector = np.asarray(context_vector)
-        self.current_mean = np.dot(self.theta, context_vector)
-        self.reward = self.base_arm.pull(self.current_mean, size=size)
+        self.current_linear_mean = np.dot(self.theta, context_vector)
+        self.reward = self.base_arm.pull(self.current_linear_mean, size=size)
         # self.reward = int(self.rng.uniform() < self.current_mean) # essentially Bernuli with p = current_mean
         return self.reward # 0 or 1 
-
-
-    def get_current_mean(self, context_vector = None):
-        if context_vector is not None:
-            return sigmoid(np.dot(self.theta, context_vector))
-        return self.current_mean
