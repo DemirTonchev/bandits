@@ -39,7 +39,7 @@ def bernuolli(p: float, seed=base_rng, *, size=None):
 def random_argmax(vector, seed=base_rng, **kwargs):
     """Helper function to select argmax at random... otherwise np.max returns the first index of where the max value is encountered."""
     rng = check_random_state(seed)
-    return rng.choice(np.nanargmax(vector), **kwargs)
+    return rng.choice(np.nonzero(vector == np.nanmax(vector))[0], **kwargs)
 
 def sigmoid(x):
     """Sigmonoid function. Accepts single number or numpy array

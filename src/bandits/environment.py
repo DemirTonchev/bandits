@@ -15,8 +15,8 @@ class SimpleEnvironment:
         self.k_arms = len(self.arms)
 
         self.means = np.asarray([arm.mean for arm in arms])
-        self.optimal_arm = np.argmax(self.means)
-        self.optimal_mean = self.means[self.optimal_arm]
+        self._optimal_arm = np.argmax(self.means)
+        self._optimal_mean = self.means[self.optimal_arm]
 
         self._observation = 0
 
@@ -31,21 +31,16 @@ class SimpleEnvironment:
         return self._observation
     
     @observation.setter
-    def observation(self, new_value):
-        self._observation = new_value
+    def observation(self, new_obs):
+        self._observation = new_obs
 
-    # def get_optimal_mean(self):
-    #     """Returns the value of the optimal(real) mean
-    #     """
-    #     return self.optimal_mean
-
-    # def get_optimal_arm(self):
-    #     """Returns the index of the optimal mean
-    #     """
-    #     return self.optimal_arm
-
-    # def get_all_means(self):
-    #     return self.means
+    @property
+    def optimal_arm(self):
+        return self._optimal_arm
+    
+    @property
+    def optimal_mean(self):
+        return self._optimal_mean
     
     #gymnasium api
     def step(self, arm_index: int):
