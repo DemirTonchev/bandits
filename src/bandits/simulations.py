@@ -3,7 +3,7 @@ from copy import deepcopy
 from joblib import Parallel, delayed
 import pandas as pd
 from typing import Protocol
-import time
+from bandits.base import check_random_state
 
 class Simuation(Protocol):
 
@@ -22,19 +22,19 @@ class SimpleSimulation:
         record_every: how often to record results from simulations
     """
 
-    def __init__(self, environment, policy, horizont: int = 10000, seed: int|None = None, record_every: int = 1):
+    def __init__(self, environment, policy, horizont: int = 10000, seed=None, record_every: int = 1):
 
         self.environment = environment
         self.policy = policy
         self.horizont = horizont
-        self.seed = seed
-        self.t = 0
+        self.seed = check_random_state(seed)
+        self.t = 1
 
         self.cumulative_reward = 0
         self.cumulative_regret = 0
         self.best_arm_pulls = 0
-        self.best_arm = environment.get_optimal_arm()
-        self.best_mean = environment.get_optimal_mean()
+        self.best_arm = environment.optimal_arm
+        self.best_mean = environment.optimal_mean
         self.record_every = record_every
 
         self.results = []
@@ -43,8 +43,8 @@ class SimpleSimulation:
 
         # pick action (arm) and observe reward
         arm_idx = self.policy.choose_action()
-        arm_reward = self.environment.get_stochastic_reward(arm_idx)
-        # policy(agent) observes reward
+        _, arm_reward, *_, info = self.environment.step(arm_idx)
+        # policy(agent) observes reward and updates
         self.policy.observe_reward(arm_idx, arm_reward)
 
         # accumulate data for regret
@@ -52,8 +52,8 @@ class SimpleSimulation:
         instant_regret = self.best_mean - self.environment.means[arm_idx]
         self.cumulative_regret += instant_regret
         self.best_arm_pulls += 1 if arm_idx == self.best_arm else 0
-        if (self.t+1) % self.record_every == 0:
-            self._data = {'t': self.t+1,
+        if self.record_every and (self.t % self.record_every == 0):
+            self._data = {'t': self.t,
                           'instant_regret': instant_regret,
                           'cumulative_regret': self.cumulative_regret,
                           'best_arm_pulls': self.best_arm_pulls,
@@ -64,7 +64,7 @@ class SimpleSimulation:
         self.t += 1
 
     def run(self) -> None:
-        np.random.seed(self.seed)
+        
         for t in range(self.horizont):
             self.run_step()
 
@@ -160,8 +160,8 @@ class ContextualSimulation():
         self.cumulative_regret += instant_regret
         self.best_arm_pulls += 1 if arm_idx == self.environment.current_optimal_arm else 0
 
-        if (self.t+1) % self.record_every == 0:
-            self._data = {'t': self.t+1,
+        if (self.t) % self.record_every == 0:
+            self._data = {'t': self.t,
                          'instant_regret': instant_regret,
                          'cumulative_regret': self.cumulative_regret,
                          'best_arm_pulls': self.best_arm_pulls,
