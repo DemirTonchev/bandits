@@ -57,13 +57,12 @@ def TS_probs(prior_history: list[list[np.ndarray]], t: int):
     [array([1, 1]), array([1, 1]), array([1, 1])]
     """
     # I dont know if this is beautiful or crazy ugly 
-    def _prod(rest):
-        def __prod(x):
-            return prod([rv.cdf(x) for rv in rest])
-        return __prod
-    def _prob(rv ,rest):
+    def _prod(rest, x):
+        return prod([rv.cdf(x) for rv in rest])
+    
+    def _prob(rv, rest):
         def prob(x):
-            return rv.pdf(x)*_prod(rest)(x)
+            return rv.pdf(x)*_prod(rest, x)
         return prob
     #--------
     rvs = [beta(*params) for params in prior_history[t]]
