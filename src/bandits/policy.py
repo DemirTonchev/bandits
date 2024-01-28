@@ -80,7 +80,6 @@ class ConstantPick(BasePolicy):
         pass
 
 
-
 class EpsilonGreedy(BasePolicy):
 
     def __init__(self, k_arms, epsilon = lambda t: 1./t, seed=None):
@@ -94,18 +93,21 @@ class EpsilonGreedy(BasePolicy):
             self.epsilon = epsilon
 
     def choose_action(self) -> int:
-        if self.rng.uniform() < self.epsilon(self.t): # logic for choosing different arm
-            arm_idx = self.rng.choice(range(self.k_arms)).item()
+        if self.t > self.k_arms:
+            if self.rng.uniform() < self.epsilon(self.t): # logic for exploration
+                arm_idx = self.rng.choice(range(self.k_arms)).item()
+            else:
+                arm_idx = random_argmax(self.estimated_means, seed=self.rng).item()
         else:
-            arm_idx = random_argmax(self.estimated_means, seed=self.rng).item()
+            arm_idx = self.t - 1 
         return arm_idx
 
     def observe_reward(self, arm_idx:int , reward: float):
-        n = len(self.arms_data[arm_idx])
+        self.pulls[arm_idx] += 1
+        n = self.pulls[arm_idx]
         self.estimated_means[arm_idx] = reward/n + (n-1)*self.estimated_means[arm_idx]/n
         # add to history
         self.arms_data[arm_idx].append(reward)
-        self.pulls[arm_idx] += 1
         self.t += 1
 
 
