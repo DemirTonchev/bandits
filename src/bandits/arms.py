@@ -26,6 +26,9 @@ class BaseArm:
     def __repr__(self) -> str:
         return self.__class__.__qualname__
     
+    def __call__(self):
+        return self.pull()
+    
 
 class ConstantArm(BaseArm):
 
