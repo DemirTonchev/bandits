@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.random import default_rng
 from bandits.base import base_rng, check_random_state, random_argmax
 from bandits.arms import Arm
 
@@ -7,55 +6,75 @@ class SimpleEnvironment:
     """Simple environment for N-armed bandit. """
 
     def __init__(self, arms: list[Arm], seed=None):
-        """Create the environment. If arms is None - default is bernulli arms
+        """Create the environment. 
         Params:
             arms - list: list of arms objects
         """
         self.arms = arms
-        self.k_arms = len(self.arms)
         self.rng = check_random_state(seed)
+        self.k_arms = len(self.arms)
 
-        arm_means = [arm.mean for arm in arms]
-        self.optimal_mean = np.max(arm_means)
-        self.optimal_arm = np.argmax(arm_means)
-        self.means = np.array(arm_means)
+        self.means = np.asarray([arm.mean for arm in arms])
+        self.optimal_arm = np.argmax(self.means)
+        self.optimal_mean = self.means[self.optimal_arm]
 
-    def get_stochastic_reward(self, arm_index):
+        self._observation = 0
+
+    def get_stochastic_reward(self, arm_index: int):
         """returns a stochastic reward after pulling(acting) arm = arm_index. This reward depends on the distsribtion of the arm.
         """
         self.reward = self.arms[arm_index].pull()
         return self.reward
     
-    def step(self, arm_index:int):
-        """first step to comply with gymnasium api. 
+    @property
+    def observation(self):
+        return self._observation
+    
+    @observation.setter
+    def observation(self, new_value):
+        self._observation = new_value
+
+    # def get_optimal_mean(self):
+    #     """Returns the value of the optimal(real) mean
+    #     """
+    #     return self.optimal_mean
+
+    # def get_optimal_arm(self):
+    #     """Returns the index of the optimal mean
+    #     """
+    #     return self.optimal_arm
+
+    # def get_all_means(self):
+    #     return self.means
+    
+    #gymnasium api
+    def step(self, arm_index: int):
+        """making stepts to comply with gymnasium api. 
+        In bandit problems, an agent selects an action, it receives a reward, the action does not affect the next observation.
+        The environment has no dynamics, so the reward is only influenced by the current action. The environment does not evolve along 
+        the time dimension, and there is no sequential decision making as in RL, no delayed rewards. 
+        Thus the episode terminates afte one step. So Terminated is True after 1 step.
         """
+        observation = 0
         info = {}
-        terminated = False
+        terminated = True
         truncated = False
-        # return observation, reward, terminated, truncated, info - gymnasium returns this on step method call
-        return self.get_stochastic_reward(arm_index)
-
-    def get_optimal_mean(self):
-        """Returns the value of the optimal(real) mean
-        """
-        return self.optimal_mean
-
-    def get_optimal_arm(self):
-        """Returns the index of the optimal mean
-        """
-        return self.optimal_arm
-
-    def get_all_means(self):
-        return self.means
+        reward = self.get_stochastic_reward(arm_index)
+        return observation, reward, terminated, truncated, info
+    
+    #gymnasium api
+    def reset(self):
+        self.info = {'reset': True}
+        return 0, self.info
 
     def __str__(self):
-        return '{} with arms: {}'.format(self.__class__.__name__, self.arms)
+        return f'{type(self).__name__} with arms: {self.arms}'
 
 class ContextualEnvironment:
 
     def __init__(self, arms, add_bias = True, seed=None, context_generator=None):
         
-        self.rng = default_rng(seed)
+        self.rng = check_random_state(seed)
         
         self.arms = arms
         self.k_arms = len(arms)

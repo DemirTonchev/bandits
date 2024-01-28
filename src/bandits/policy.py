@@ -62,7 +62,7 @@ class BasePolicy:
         raise NotImplementedError()
 
     def __str__(self):
-        return f"{self.__class__.__name__} with {self.k_arms} arms"
+        return f"{type(self).__name__} with {self.k_arms} arms"
 
 class ConstantPick(BasePolicy):
     """Pick always the same arm, mainly for testing purposes
