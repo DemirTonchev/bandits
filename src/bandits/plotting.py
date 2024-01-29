@@ -49,23 +49,23 @@ def TS_probs3(prior_history: list[list[np.ndarray]], t: int):
     f3 = lambda x: a3.pdf(x)*a1.cdf(x)*a2.cdf(x) # prob of max for a_3
     return [scipy.integrate.quad(f,0,1)[0] for f in [f1,f2,f3]]
 
-def TS_probs(prior_history: list[list[np.ndarray]], t: int):
+def TS_probs(prior_history: list[np.ndarray]):
     """Analitical solutions of the probability that each arm is the best at time t.
     Should work for any number of arms
     prior_history - list of list with beta params at each t. eg
     at t=0 the list of beta params looks like 
     [array([1, 1]), array([1, 1]), array([1, 1])]
+
+    Returns the probability of each arm being the max
     """
     # I dont know if this is beautiful or crazy ugly 
-    def _prod(rest, x):
-        return prod([rv.cdf(x) for rv in rest])
-    
     def _prob(rv, rest):
+        #  we want a f of x for the integration
         def prob(x):
-            return rv.pdf(x)*_prod(rest, x)
+            return rv.pdf(x)*prod([rv_.cdf(x) for rv_ in rest])
         return prob
     #--------
-    rvs = [beta(*params) for params in prior_history[t]]
+    rvs = [beta(*params) for params in prior_history]
     fs = []
     for i in range(len(rvs)):
         rv = rvs[i]
