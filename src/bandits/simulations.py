@@ -27,7 +27,6 @@ class SimpleSimulation:
         self.environment = environment
         self.policy = policy
         self.horizont = horizont
-        self.seed = check_random_state(seed)
         self.t = 1
 
         self.cumulative_reward = 0
@@ -83,9 +82,10 @@ def _run_simulation(simulation, sid = None, full_results = True):
         result = [simulation.results[-1]]
     # put simulation identifier
     for step_results in result:
-        step_results.update({'id':sid,
-                          'policyType': simulation.policy.__class__.__name__,
-                          })
+        step_results.update({
+                    'id': sid,
+                    'policyType': type(simulation.policy).__name__,
+            })
     return result
 
 class ParallelSimulation:
@@ -133,7 +133,6 @@ class ContextualSimulation():
         self.environment = environment
         self.policy = policy
         self.horizont = horizont
-        self.seed = seed
         self.t = 0
 
         self.cumulative_reward = 0
@@ -175,7 +174,6 @@ class ContextualSimulation():
         self.t += 1
 
     def run(self):
-        np.random.seed(self.seed)
         for t in range(self.horizont):
             self.run_step()
 
