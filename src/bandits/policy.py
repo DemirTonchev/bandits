@@ -170,13 +170,14 @@ class UCB1(BasePolicy):
 class GradientSoftmax(BasePolicy):
     """beta feature
     """
-    def __init__(self, k_arms: int, preferences: Optional[np.ndarray] = None, baseline: bool = False, seed=None):
+    def __init__(self, k_arms: int, preferences: Optional[np.ndarray] = None, baseline: bool = True, seed=None, min_lr=0.01):
         super().__init__(k_arms)
     
-        self.preferences = preferences or np.zeros(k_arms)
+        self.preferences = np.zeros(k_arms) if preferences is None else np.asarray(preferences)
         self.baseline = baseline
         self.rng = check_random_state(seed)
         self.cum_rewards = 0
+        self.min_lr = min_lr
     
     def choose_action(self) -> int:
         if self.t > self.k_arms:
@@ -190,8 +191,8 @@ class GradientSoftmax(BasePolicy):
         self.arms_data[arm_idx].append(reward)
         self.cum_rewards += reward
         n = self.pulls[arm_idx]
-        self.lr = max(1/n, 0.01)
-        gradient = np.where(np.arange(self.k_arms)==arm_idx, 1, 0) - softmax(self.preferences)
+        self.lr = max(1/n, self.min_lr)
+        gradient = np.where(np.arange(self.k_arms) == arm_idx, 1, 0) - softmax(self.preferences)
         # theta = theta + lr * R_t * gradient log(pi(theta)) / dtheta
         baseline = self.cum_rewards/self.pulls.sum() if self.baseline else 0
         self.preferences += self.lr * (reward - baseline) * gradient
@@ -318,7 +319,7 @@ class LinUCB:
     def state_dict(self):
         
         return {
-                "As": deepcopy(self.As), # its a list so it needs a deepcopy....
+                "As": deepcopy(self.As), # its a list so it needs a deepcopy
                 "bs": deepcopy(self.bs), # same
                 "alpha" : self.alpha
                 }

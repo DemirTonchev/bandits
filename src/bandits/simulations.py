@@ -70,16 +70,14 @@ class SimpleSimulation:
     def to_pandas(self) -> pd.DataFrame:
         return pd.DataFrame(self.results)
 
-def _run_simulation(simulation, sid = None, full_results = True):
+def _run_simulation(simulation, sid = None):
     """ Helper function for Parralel computation of several simulations.
     Returns list of dictionaries of results for a particular simulation with id and policy
     type added
     """
     simulation.run()
-    if full_results:
-        result = simulation.results
-    else:
-        result = [simulation.results[-1]]
+    result = simulation.results
+   
     # put simulation identifier
     for step_results in result:
         step_results.update({
@@ -90,7 +88,7 @@ def _run_simulation(simulation, sid = None, full_results = True):
 
 class ParallelSimulation:
 
-    def __init__(self, simulation: SimpleSimulation, n_simulations: int = 1, n_jobs:int = 1, full_results: bool = True):
+    def __init__(self, simulation: SimpleSimulation, n_simulations: int = 1, n_jobs:int = 1):
         """Runs an instance of simulation n_simulations times in parrarel given by n_jobs
         Params:
             simulation - instance of SimpleSimulation with loaded policy and environment variables
@@ -102,11 +100,10 @@ class ParallelSimulation:
         self.n_simulations = n_simulations
         self.n_jobs = n_jobs
         self.ids = [f'id-{i+1}' for i in range(n_simulations)]
-        self.full_results = full_results
 
     def run(self, verbose = 0):
         self.results = Parallel(n_jobs=self.n_jobs, verbose=verbose)(delayed(_run_simulation)(
-                deepcopy(self.simulation), self.ids[i], self.full_results)
+                deepcopy(self.simulation), self.ids[i])
                 for i in range(self.n_simulations))
 
     def to_pandas(self) -> pd.DataFrame:
