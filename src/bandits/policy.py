@@ -257,6 +257,19 @@ class BetaBernoulliTS(BasePolicy):
 
         return policy
 
+class BetaBernoulliTSBatch(BetaBernoulliTS):
+
+    def observe_reward(self, arm_idx: int, reward: float = None, successes: int = None, failures: int = None) -> None:
+        if all(arg is None for arg in (reward, successes, failures)):
+            raise ValueError("Either reward or successes and failures must be provided")
+        if reward is not None:
+            super().observe_reward(arm_idx, reward)
+        elif (successes is not None) and (failures is not None):
+            # we can do that because of bayesian math 
+            rewards_seq = [1]*successes + [0]*failures
+            for r in rewards_seq:
+                _ = super().choose_action() # for the history keeping not really used (should do sth about this..)
+                super().observe_reward(arm_idx, r)
 
 class LinUCB:
     """LinUCB policy from A Contextual-Bandit Approach to Personalized News Article
