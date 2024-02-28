@@ -2,6 +2,7 @@ import numpy as np
 from bandits.base import base_rng, check_random_state, random_argmax
 from bandits.arms import Arm
 
+
 class SimpleEnvironment:
     """Simple environment for N-armed bandit. """
 
@@ -25,11 +26,11 @@ class SimpleEnvironment:
         """
         self.reward = self.arms[arm_index].pull()
         return self.reward
-    
+
     @property
     def observation(self):
         return self._observation
-    
+
     @observation.setter
     def observation(self, new_obs):
         self._observation = new_obs
@@ -37,12 +38,12 @@ class SimpleEnvironment:
     @property
     def optimal_arm(self):
         return self._optimal_arm
-    
+
     @property
     def optimal_mean(self):
         return self._optimal_mean
-    
-    #gymnasium api
+
+    # gymnasium api
     def step(self, arm_index: int):
         """making stepts to comply with gymnasium api. 
         In bandit problems, an agent selects an action, it receives a reward, the action does not affect the next observation.
@@ -56,8 +57,8 @@ class SimpleEnvironment:
         truncated = False
         reward = self.get_stochastic_reward(arm_index)
         return observation, reward, terminated, truncated, info
-    
-    #gymnasium api
+
+    # gymnasium api
     def reset(self):
         self.info = {'reset': True}
         return 0, self.info
@@ -65,12 +66,13 @@ class SimpleEnvironment:
     def __str__(self):
         return f'{type(self).__name__} with arms: {self.arms}'
 
+
 class ContextualEnvironment:
 
-    def __init__(self, arms, add_bias = True, seed=None, context_generator=None):
-        
+    def __init__(self, arms, add_bias=True, seed=None, context_generator=None):
+
         self.rng = check_random_state(seed)
-        
+
         self.arms = arms
         self.k_arms = len(arms)
         self.dimension = arms[0].dimension
@@ -83,7 +85,6 @@ class ContextualEnvironment:
         self.current_means = None
         self.current_rewards = None
         self.current_context = None
-    
 
     def generate_context(self):
         """Generates context vector and computes current
@@ -93,11 +94,11 @@ class ContextualEnvironment:
             context = self.context_generator()
         else:
             context = []
-            context_vector = self.rng.uniform(0, 1, size=self.dimension - (1 if self.add_bias else 0) ).round(2)
+            context_vector = self.rng.uniform(0, 1, size=self.dimension - (1 if self.add_bias else 0)).round(2)
             if self.add_bias:
                 context_vector = np.append([1], context_vector)
             # v momenta context e ednakyv, no moje i trqbwa da se dobavi informaciqta ot action a_i, w drug
-            # obekt koito ima generate_context(self, arms_context) i da se concat kym tozi 
+            # obekt koito ima generate_context(self, arms_context) i da se concat kym tozi
             context = [context_vector for _ in range(self.k_arms)]
         self.current_context = context
         return context
@@ -105,11 +106,13 @@ class ContextualEnvironment:
     def get_stochastic_reward(self, arm_index):
         # pull all arms to generate current mean, rewards and get the optimal one
         # agent/policy/algorithm knows only the context but true means are not revealed
-        self.current_rewards = [arm.pull(context_vector) for arm, context_vector in zip(self.arms, self.current_context)]
+        self.current_rewards = [arm.pull(context_vector)
+                                for arm, context_vector in zip(self.arms, self.current_context)]
         self.current_means = [arm.get_current_mean() for arm in self.arms]
         self.current_optimal_arm = random_argmax(self.current_means)
         self.current_optimal_mean = self.current_means[self.current_optimal_arm]
         return self.current_rewards[arm_index]
+
 
 class SimpleContextualEnvironment(ContextualEnvironment):
     """Simple env 2 states (context) and n arms. 
@@ -127,10 +130,9 @@ class SimpleContextualEnvironment(ContextualEnvironment):
         """
         context_vector = np.array([self.rng.choice([-1.0, 1.0])])
         if self.add_bias:
-                context_vector = np.append([1], context_vector)
+            context_vector = np.append([1], context_vector)
         self.current_context = [context_vector for _ in range(self.k_arms)]
         return self.current_context
-    
 
     def ucb_max_regret(T, environment):
         deltas = environment.optimal_mean - environment.means

@@ -5,6 +5,8 @@ EPS = 1E-4
 base_rng = np.random.default_rng()
 
 # Copied from scipy.stats._qmc.check_random_state
+
+
 def check_random_state(seed=None):
     """Turn `seed` into a `numpy.random.Generator` instance.
 
@@ -29,8 +31,8 @@ def check_random_state(seed=None):
     else:
         raise ValueError(f'{seed!r} cannot be used to seed a'
                          ' numpy.random.Generator instance')
-    
-    
+
+
 def bernuolli(p: float, seed=base_rng, *, size=None):
     rng = check_random_state(seed)
     return rng.binomial(1, p, size)
@@ -41,15 +43,17 @@ def random_argmax(vector, seed=base_rng, **kwargs):
     rng = check_random_state(seed)
     return rng.choice(np.nonzero(vector == np.nanmax(vector))[0], **kwargs)
 
+
 def sigmoid(x):
     """Sigmonoid function. Accepts single number or numpy array
     """
     return 1/(1+np.exp(-x))
 
+
 def softmax(x, axis=None):
     r"""
     Copied from scipy - https://github.com/scipy/scipy/blob/main/scipy/special/_logsumexp.py#L131
-    
+
     Compute the softmax function.
 
     The softmax function transforms each element of a collection by
@@ -81,16 +85,22 @@ def softmax(x, axis=None):
 #     deltas = deltas[np.nonzero(deltas)]
 #     return 8*np.log(T)*np.sum(1/deltas) + (1+(np.pi**2)/3)*np.sum(deltas)
 
+
 def _check_kl_bernulli(p):
-    if np.isclose(p,0): p = EPS
-    elif np.isclose(p,1): p = 1-EPS
-    else: p
+    if np.isclose(p, 0):
+        p = EPS
+    elif np.isclose(p, 1):
+        p = 1-EPS
+    else:
+        p
     return p
+
 
 def kl_bernulli(p, q):
     p = _check_kl_bernulli(p)
     q = _check_kl_bernulli(q)
-    #should have the same check for near 1
+    # should have the same check for near 1
     return p*np.log(p/q) + (1-p)*np.log((1-p)/(1-q))
+
 
 kl_bernulli = np.vectorize(kl_bernulli)

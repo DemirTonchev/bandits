@@ -5,12 +5,15 @@ import pandas as pd
 from typing import Protocol
 from bandits.base import check_random_state
 
+
 class Simuation(Protocol):
 
     def run_step(self) -> None:
         ...
+
     def run(self) -> None:
         ...
+
 
 class SimpleSimulation:
     """Basic class for a sigle simulation for simple (non-contextual) environment and a particular policy
@@ -57,38 +60,40 @@ class SimpleSimulation:
                           'cumulative_regret': self.cumulative_regret,
                           'best_arm_pulls': self.best_arm_pulls,
                           'arm_pulled': arm_idx
-            }
+                          }
             self.results.append(self._data)
 
         self.t += 1
 
     def run(self) -> None:
-        
+
         for t in range(self.horizont):
             self.run_step()
 
     def to_pandas(self) -> pd.DataFrame:
         return pd.DataFrame(self.results)
 
-def _run_simulation(simulation, sid = None):
+
+def _run_simulation(simulation, sid=None):
     """ Helper function for Parralel computation of several simulations.
     Returns list of dictionaries of results for a particular simulation with id and policy
     type added
     """
     simulation.run()
     result = simulation.results
-   
+
     # put simulation identifier
     for step_results in result:
         step_results.update({
-                    'id': sid,
-                    'policyType': type(simulation.policy).__name__,
-            })
+            'id': sid,
+            'policyType': type(simulation.policy).__name__,
+        })
     return result
+
 
 class ParallelSimulation:
 
-    def __init__(self, simulation: SimpleSimulation, n_simulations: int = 1, n_jobs:int = 1):
+    def __init__(self, simulation: SimpleSimulation, n_simulations: int = 1, n_jobs: int = 1):
         """Runs an instance of simulation n_simulations times in parrarel given by n_jobs
         Params:
             simulation - instance of SimpleSimulation with loaded policy and environment variables
@@ -101,10 +106,10 @@ class ParallelSimulation:
         self.n_jobs = n_jobs
         self.ids = [f'id-{i+1}' for i in range(n_simulations)]
 
-    def run(self, verbose = 0):
+    def run(self, verbose=0):
         self.results = Parallel(n_jobs=self.n_jobs, verbose=verbose)(delayed(_run_simulation)(
-                deepcopy(self.simulation), self.ids[i])
-                for i in range(self.n_simulations))
+            deepcopy(self.simulation), self.ids[i])
+            for i in range(self.n_simulations))
 
     def to_pandas(self) -> pd.DataFrame:
         if not hasattr(self, 'results'):
@@ -114,6 +119,7 @@ class ParallelSimulation:
 
     def get_results(self) -> list:
         return self.results
+
 
 class ContextualSimulation():
     """Sigle simulation for contextual environment and a particular policy
@@ -125,7 +131,7 @@ class ContextualSimulation():
         record_every: how often to record results from simulations
     """
 
-    def __init__(self, environment, policy, horizont=10000, seed = None, record_every = 1):
+    def __init__(self, environment, policy, horizont=10000, seed=None, record_every=1):
 
         self.environment = environment
         self.policy = policy
@@ -158,14 +164,14 @@ class ContextualSimulation():
 
         if (self.t) % self.record_every == 0:
             self._data = {'t': self.t,
-                         'instant_regret': instant_regret,
-                         'cumulative_regret': self.cumulative_regret,
-                         'best_arm_pulls': self.best_arm_pulls,
-                         'pulled_arm' : arm_idx,
-                         'reward': arm_reward,
-                         'current_best_arm': self.environment.current_optimal_arm,
-                         'context': context[0]
-                         }
+                          'instant_regret': instant_regret,
+                          'cumulative_regret': self.cumulative_regret,
+                          'best_arm_pulls': self.best_arm_pulls,
+                          'pulled_arm': arm_idx,
+                          'reward': arm_reward,
+                          'current_best_arm': self.environment.current_optimal_arm,
+                          'context': context[0]
+                          }
             self.results.append(self._data)
 
         self.t += 1
