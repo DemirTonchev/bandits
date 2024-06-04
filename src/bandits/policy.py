@@ -1,11 +1,11 @@
-from typing import Optional, Self, Protocol
+from typing import List, Optional, Self, Protocol
 from copy import deepcopy
 
 import numpy as np
 from bandits.base import check_random_state, random_argmax, base_rng, softmax
 from functools import partial
 from numpy import linalg
-
+import math
 
 def safe_min_1d(array):
     """Useful for taking min arm index for some policies
@@ -86,7 +86,7 @@ class ConstantPick(BasePolicy):
 
 class EpsilonGreedy(BasePolicy):
 
-    def __init__(self, k_arms, epsilon=lambda t: 1./t, seed=None):
+    def __init__(self, k_arms, epsilon=lambda t: 1./t, seed=None): # noqa
 
         super().__init__(k_arms)
         self.rng = check_random_state(seed)
@@ -109,7 +109,7 @@ class EpsilonGreedy(BasePolicy):
     def observe_reward(self, arm_idx: int, reward: float):
         self.pulls[arm_idx] += 1
         n = self.pulls[arm_idx]
-        self.estimated_means[arm_idx] = reward/n + (n-1)*self.estimated_means[arm_idx]/n
+        self.estimated_means[arm_idx] = reward/n + (n-1)*self.estimated_means[arm_idx]/n # noqa
         # add to history
         self.arms_data[arm_idx].append(reward)
         self.t += 1
@@ -123,7 +123,7 @@ class UCB1(BasePolicy):
 
         super().__init__(k_arms)
 
-        self.radius = lambda t, n: np.sqrt(2*np.log(t)/n)
+        self.radius = lambda t, n: np.sqrt(2*np.log(t)/n) # noqa
         # start with infitinite UCB currently this is computed after at least each arm is pulled(placeholder)
         self.UCBs = np.full(k_arms, np.inf)
         # history keeping
@@ -154,7 +154,7 @@ class UCB1(BasePolicy):
         self.pulls[arm_idx] += 1  # lets leave this here for now
         self.arms_data[arm_idx].append(reward)
         n = self.pulls[arm_idx]
-        self.estimated_means[arm_idx] = reward/n + (n-1)*self.estimated_means[arm_idx]/n
+        self.estimated_means[arm_idx] = reward/n + (n-1)*self.estimated_means[arm_idx]/n  # noqa
         self.t += 1
 
     def state_dict(self) -> dict:
@@ -198,10 +198,10 @@ class GradientSoftmax(BasePolicy):
         self.arms_data[arm_idx].append(reward)
         self.cum_rewards += reward
         n = self.pulls[arm_idx]
-        self.lr = max(1/n, self.min_lr)
+        self.lr = max(1 / n, self.min_lr)
         gradient = np.where(np.arange(self.k_arms) == arm_idx, 1, 0) - softmax(self.preferences)
         # theta = theta + lr * R_t * gradient log(pi(theta)) / dtheta
-        baseline = self.cum_rewards/self.pulls.sum() if self.baseline else 0
+        baseline = self.cum_rewards / self.pulls.sum() if self.baseline else 0
         self.preferences += self.lr * (reward - baseline) * gradient
         self.t += 1
 
@@ -223,7 +223,7 @@ class BetaBernoulliTS(BasePolicy):
             prior_data = [np.array(data) for data in prior_data]
             self.prior_data = prior_data
         self.rng = check_random_state(seed)
-        self.estimated_means = np.array([prior[0]/np.sum(prior) for prior in self.prior_data])
+        self.estimated_means = np.array([prior[0] / np.sum(prior) for prior in self.prior_data])
         # history keeping
         self.keep_history = keep_history
         self.prior_data_history = []
@@ -241,12 +241,32 @@ class BetaBernoulliTS(BasePolicy):
         return random_argmax(self._sample_from_arms())
 
     def observe_reward(self, arm_idx: int, reward: float) -> None:
-        self.prior_data[arm_idx] = self.prior_data[arm_idx] + np.array([reward, 1-reward], dtype=np.int32)
+        self.prior_data[arm_idx] = self.prior_data[arm_idx] + np.array([reward, 1 - reward], dtype=np.int32)
 
         self.arms_data[arm_idx].append(reward)
-        self.estimated_means[arm_idx] = self.prior_data[arm_idx][0]/np.sum(self.prior_data[arm_idx])
+        self.estimated_means[arm_idx] = self.prior_data[arm_idx][0] / np.sum(self.prior_data[arm_idx])
         self.t += 1
         self.pulls[arm_idx] += 1
+
+    def get_best_arm_prob(self):
+        """Analitical solutions of the probability that each arm is the best at the current time.
+        Same as the probability of picking the next arm to interact with the environemnt.
+        """
+        import scipy
+
+        def _prob(rv, rest):
+            #  we want a f of x for the integration
+            def prob(x):
+                return rv.pdf(x) * math.prod([rv_.cdf(x) for rv_ in rest])
+            return prob
+        # --------
+        rvs = [scipy.stats.beta(*params) for params in self.prior_data]
+        fs = []
+        for i in range(len(rvs)):
+            rv = rvs[i]
+            rest = [rvs[j] for j in range(len(rvs)) if j != i]
+            fs.append(_prob(rv, rest))
+        return [scipy.integrate.quad(f, 0, 1)[0] for f in fs]
 
     def state_dict(self) -> dict:
         return {
@@ -273,10 +293,10 @@ class BetaBernoulliTSBatch(BetaBernoulliTS):
             super().observe_reward(arm_idx, reward)
         elif (successes is not None) and (failures is not None):
             # we can do that because of bayesian math
-            rewards_seq = [1]*successes + [0]*failures
+            rewards_seq = [1] * successes + [0] * failures
             for r in rewards_seq:
-                _ = super().choose_action()  # for the history keeping not really used (should do sth about this..)
-                super().observe_reward(arm_idx, r)
+                _ = self.choose_action()  # for the history keeping not really used (should do sth about this..)
+                self.observe_reward(arm_idx, r)
 
 
 class LinUCB:
@@ -290,7 +310,7 @@ class LinUCB:
         self.d = dimension
         self.delta = delta
         self.theta_hat = [np.zeros(dimension) for _ in range(k_arms)]
-        self.alpha = 1 + np.sqrt(np.log(2/delta)/(2)) if alpha is None else alpha
+        self.alpha = 1 + np.sqrt(np.log(2 / delta) / 2) if alpha is None else alpha
         # using the notation from the paper
         # TODO make those np arrays not lists
         self.As = [np.identity(dimension) for _ in range(k_arms)]
@@ -358,6 +378,74 @@ class LinUCB:
         self.As = state_dict['As']
         self.bs = state_dict['bs']
         self.alpha = state_dict['alpha']
+
+
+class LinUCBSets:
+    """LinUCB policy from A Contextual-Bandit Approach to Personalized News Article
+    Recommendation (li et al).
+    """
+
+    def __init__(self, top_k, dimension, delta=0.05, alpha=None):
+
+        self.top_k = top_k
+        self.d = dimension
+        self.delta = delta
+        self.theta_hat = np.zeros(dimension)
+        self.alpha = 1 + np.sqrt(np.log(2 / delta) / 2) if alpha is None else alpha
+        # using the notation from the paper
+        # TODO make those np arrays not lists
+        self.A = np.identity(dimension)
+        # self.A_inv = np.identity(dimension)
+        self.b = np.zeros(dimension)
+
+        self.t = 1
+        # self.arms_data = [[] for _ in range(k_arms)]
+        # self.pulls = np.zeros(k)
+
+    def _compute_theta(self, A, b):
+        theta_hat = np.dot(linalg.inv(A), b)
+        return theta_hat
+
+    def _compute_ucb(self, theta_hat, context_vector, alpha, A):
+        estimated_mean = np.dot(theta_hat, context_vector)
+        deviation = alpha * np.sqrt(linalg.multi_dot([context_vector,
+                                                      linalg.inv(A),
+                                                      context_vector]))
+        return estimated_mean + deviation
+
+    def _update_A(self, A, context_vectors):
+        new_A = A
+        for vector in context_vectors:
+            new_A += np.outer(vector, vector)
+        return new_A
+
+    def _update_b(self, b, context_vectors, rewards):
+        new_b = b
+        for vector, r in zip(context_vectors, rewards):
+            new_b += r * vector
+        return new_b
+
+    def choose_action(self, contexts: np.ndarray):
+        self.contexts = contexts
+        # context contains all context_vectors for all arms
+        self.ucbs = np.array([self._compute_ucb(self.theta_hat, context, self.alpha, self.A) for
+                              context in contexts])
+
+        arm_idxs = []  # S in the paper
+        print(self.ucbs)
+        for k in range(self.top_k):
+            idx = random_argmax(self.ucbs)
+            arm_idxs.append(idx)
+            self.ucbs[idx] = -np.inf  # essentially makes it unchoosable for argmax
+        return arm_idxs
+
+    def observe_reward(self, arm_idxs, rewards):
+
+        self.A = self._update_A(self.A, self.contexts[arm_idxs])
+        self.b = self._update_b(self.b, self.contexts[arm_idxs], rewards)
+        self.theta_hat = self._compute_theta(self.A, self.b)
+        # add history
+        self.t += 1
 
 
 class LinThompsonSampling(LinUCB):
