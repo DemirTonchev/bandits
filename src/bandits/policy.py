@@ -277,7 +277,9 @@ class BetaBernoulliTS(BasePolicy):
 
     @classmethod
     def from_state_dict(cls, state_dict: dict) -> Self:
-        policy = cls(k_arms=state_dict["k_arms"],
+        state_dict = deepcopy(state_dict)
+        k_arms = len(state_dict['prior_data'])
+        policy = cls(k_arms=k_arms,
                      prior_data=state_dict["prior_data"])
         policy.t = state_dict["t"]
 
