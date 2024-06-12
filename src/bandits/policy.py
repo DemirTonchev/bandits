@@ -270,7 +270,6 @@ class BetaBernoulliTS(BasePolicy):
 
     def state_dict(self) -> dict:
         return {
-            "k_arms": self.k_arms,
             "prior_data": deepcopy(self.prior_data),
             "t": self.t
         }
