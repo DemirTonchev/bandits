@@ -285,7 +285,7 @@ class BetaBernoulliTS(BasePolicy):
         return policy
 
 
-class BetaBernoulliTSBatch(BetaBernoulliTS):
+class BetaBernoulliTSSequence(BetaBernoulliTS):
 
     def observe_reward(self, arm_idx: int, reward: float = None, successes: int = None, failures: int = None) -> None:
         if all(arg is None for arg in (reward, successes, failures)):
