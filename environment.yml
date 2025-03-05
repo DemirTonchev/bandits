@@ -1,13 +1,12 @@
-name: banditsoss
+name: bandits
 channels:
-  - nodefaults
   - conda-forge
 dependencies:
-  - python=3.11
+  - python>=3.12
   - numpy
+  - scipy
   - pandas>2
   - jupyterlab
-  - joblib
   - pip
   - pip:
     - seaborn
