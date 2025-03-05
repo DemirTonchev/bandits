@@ -81,7 +81,9 @@ class PoissonArm(BaseArm):
     def pull(self, size=None):
         return self.rng.poisson(lam=self.mean, size=size)
 
+
 Vector1d: TypeAlias = list[float] | np.ndarray
+
 
 class ContextualBaseArm:
 
@@ -93,10 +95,11 @@ class ContextualBaseArm:
 
     def __str__(self) -> str:
         return self.__class__.__qualname__
-    
+
     def __call__(self, context: Vector1d, **kwargs) -> float:
         return self.pull(context, **kwargs)
-    
+
+
 class LinearArm(ContextualBaseArm):
 
     def __init__(self, theta: Vector1d, seed=None) -> None:
@@ -104,8 +107,10 @@ class LinearArm(ContextualBaseArm):
         self.theta = theta
 
     def pull(self, context: Vector1d, size=None) -> float:
-
         return np.dot(self.theta, context)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.__dict__['theta'].tolist()})"
 
 
 class LinearNormalArm(ContextualBaseArm):
@@ -136,10 +141,3 @@ class LinearNormalArm(ContextualBaseArm):
         context = np.asarray(context)
         self.current_mean = np.dot(self.theta, context)
         return self.rng.normal(self.current_mean, self.sigma, size=size)
-
-    # def __call__(self, context: Vector1d, size=None) -> float:
-    #     return super().__call__(context, size)
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}({self.__dict__['theta'].tolist()})"
-
