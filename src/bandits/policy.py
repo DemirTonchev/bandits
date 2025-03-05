@@ -86,7 +86,7 @@ class ConstantPick(BasePolicy):
 
 class EpsilonGreedy(BasePolicy):
 
-    def __init__(self, k_arms, epsilon=lambda t: 1./t, seed=None): # noqa
+    def __init__(self, k_arms, epsilon=lambda t: 1. / t, seed=None):  # noqa
 
         super().__init__(k_arms)
         self.rng = check_random_state(seed)
@@ -109,7 +109,7 @@ class EpsilonGreedy(BasePolicy):
     def observe_reward(self, arm_idx: int, reward: float):
         self.pulls[arm_idx] += 1
         n = self.pulls[arm_idx]
-        self.estimated_means[arm_idx] = reward/n + (n-1)*self.estimated_means[arm_idx]/n # noqa
+        self.estimated_means[arm_idx] = reward / n + (n - 1) * self.estimated_means[arm_idx] / n  # noqa
         # add to history
         self.arms_data[arm_idx].append(reward)
         self.t += 1
@@ -123,7 +123,7 @@ class UCB1(BasePolicy):
 
         super().__init__(k_arms)
 
-        self.radius = lambda t, n: np.sqrt(2*np.log(t)/n) # noqa
+        self.radius = lambda t, n: np.sqrt(2 * np.log(t) / n)  # noqa
         # start with infitinite UCB currently this is computed after at least each arm is pulled(placeholder)
         self.UCBs = np.full(k_arms, np.inf)
         # history keeping
@@ -154,7 +154,7 @@ class UCB1(BasePolicy):
         self.pulls[arm_idx] += 1  # lets leave this here for now
         self.arms_data[arm_idx].append(reward)
         n = self.pulls[arm_idx]
-        self.estimated_means[arm_idx] = reward/n + (n-1)*self.estimated_means[arm_idx]/n  # noqa
+        self.estimated_means[arm_idx] = reward / n + (n - 1) * self.estimated_means[arm_idx] / n  # noqa
         self.t += 1
 
     def state_dict(self) -> dict:
