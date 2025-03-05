@@ -2,10 +2,13 @@ from typing import List, Optional, Self, Protocol
 from copy import deepcopy
 
 import numpy as np
-from bandits.base import check_random_state, random_argmax, base_rng, softmax
 from functools import partial
 from numpy import linalg
 import math
+from scipy.special import expit  # noqa
+import scipy.optimize  # noqa
+
+from bandits.base import check_random_state, random_argmax, base_rng, softmax
 
 def safe_min_1d(array):
     """Useful for taking min arm index for some policies
@@ -449,17 +452,22 @@ class LinUCBSets:
         self.t += 1
 
 
-class LinThompsonSampling(LinUCB):
+class LinThompsonSampling:
     """This policy follows the algorithm of https://arxiv.org/pdf/1209.3352.pdf
     """
 
-    def __init__(self, k_arms, dimension, v2: float = 1, seed: int | None = None):
-        super().__init__(k_arms, dimension)
-
+    def __init__(self, k_arms, dimension, v2: float = 1., seed: int | None = None):
+        self.k_arms = k_arms
+        self.d = dimension
         self.v2 = v2
         self.rng = check_random_state(seed)
+        self.B = np.eye(self.d)
+        self.mu_hat = np.zeros(self.d)
+        self.f = np.zeros(self.d)
+        self.contexts = np.array([])
+
         # TODO covariance could be saved and updated on need bases and thus save on compute
-        self.covariances = None  # this is A_inv/B_inv
+        # self.covariances = None  # this is A_inv/B_inv
 
     # @property
     # def nu(self):
@@ -467,8 +475,7 @@ class LinThompsonSampling(LinUCB):
     #     # return np.sqrt(9*self.dimension*np.log(self._t/self.delta))
 
     def _sample_mu(self, mean, covariance):
-        sample = self.rng.multivariate_normal(mean, covariance)
-        return sample
+        return self.rng.multivariate_normal(mean, covariance)
 
     # def _estimate_mean(self, theta_hat, context_vector, A):
     #     estimated_reward = np.dot(self._sample_mu(theta_hat, np.linalg.inv(A)),
@@ -476,19 +483,100 @@ class LinThompsonSampling(LinUCB):
     #     print(estimated_reward)
     #     return estimated_reward
 
-    def choose_action(self, context):
+    def choose_action(self, contexts):
+        self.contexts = contexts  # save the state for the update/observe reward
         # context contains all context_vectors for all arms
-        self.context = context
-        A_inv = self.covariances = [np.linalg.inv(self.As[i])
-                                    for i in range(self.k_arms)]  # A_inv just for clarity remove later
-        mu_tilde = [self._sample_mu(self.theta_hat[i], self.v2 * self.covariances[i]) for i in range(self.k_arms)]
-        self.estimated_rewards = [np.dot(mu_tilde[i], context[i]) for i in range(self.k_arms)]
+        B_inv = np.linalg.inv(self.B)
+        # sample mean vector
+        mu_tilde = self._sample_mu(self.mu_hat, self.v2 * B_inv)
+        self.estimated_rewards = [np.dot(mu_tilde, xvec) for xvec in contexts]
         return random_argmax(self.estimated_rewards)
 
     def observe_reward(self, arm_idx, reward):
-        self.As[arm_idx] = self._update_A(self.As[arm_idx], self.context[arm_idx])
-        self.bs[arm_idx] = self._update_b(self.bs[arm_idx], self.context[arm_idx], reward)
+        cvec = self.contexts[arm_idx]
+        self.B = self.B + np.outer(cvec, cvec)
+        self.f = self.f + reward * cvec
 
-        self.theta_hat[arm_idx] = self._compute_theta(self.As[arm_idx], self.bs[arm_idx])
-        # add history
-        self._record_and_increment_time(arm_idx, reward)
+        self.mu_hat = np.dot(np.linalg.inv(self.B), self.f)
+
+
+
+
+def logLikelihoodLogit(beta, X, y):
+    z = np.dot(X, beta)
+    y_hat = expit(z)
+    return -np.sum(y * np.log(y_hat) + (1 - y) * np.log(1 - y_hat))
+
+
+def logLikelihoodLogit_regularized(beta, X, y, tau_squared=1):
+    z = np.dot(X, beta)
+    y_hat = expit(z)
+    return - (np.sum(y * np.log(y_hat) + (1 - y) * np.log(1 - y_hat))) + np.dot(beta, beta) / (2 * tau_squared)
+
+# gradient functions
+def likelihoodScore(beta, X, y):  # noqa
+    z = np.dot(X, beta)
+    y_hat = expit(z)
+    return np.dot(X.T, (y_hat - y))
+
+
+def likelihoodScore_regularized(beta, X, y, tau_squared=1):
+    z = np.dot(X, beta)
+    y_hat = expit(z)
+    return np.dot(X.T, (y_hat - y)) + beta / tau_squared
+
+
+class LogThompsonSampling:
+    """This policy follows the algorithm of https://arxiv.org/pdf/1703.00048 with bayesian additions
+    """
+
+    def __init__(self, k_arms, dimension, v2: float = 1., seed: int | None = None):
+        self.k_arms = k_arms
+        self.d = dimension
+        self.v2 = v2
+        self.rng = check_random_state(seed)
+        self.B = np.eye(self.d) / self.v2
+        self.hess_inv = np.eye(self.d)
+        self.mu_hat = np.zeros(self.d)
+        self.f = np.zeros(self.d)
+        self.contexts = []
+        self.rewards = []
+
+    def _sample_mu(self, mean, covariance):
+        return self.rng.multivariate_normal(mean, covariance)
+    
+    def _solve(self, X, y):
+        optimLogit = scipy.optimize.minimize(
+            logLikelihoodLogit_regularized,
+            x0=np.zeros(self.d),
+            jac=likelihoodScore_regularized,
+            args=(X, y, self.v2)
+        )
+
+        return optimLogit.x, optimLogit.hess_inv
+
+    def choose_action(self, contexts):
+
+        self.current_contexts = contexts  # save the state for the update/observe reward
+        # context contains all context_vectors for all arms
+        # B_inv = self.hess_inv
+        B_inv = np.linalg.inv(self.B)
+        # sample mean vector
+        mu_tilde = self._sample_mu(self.mu_hat, self.v2 * B_inv)
+        self.estimated_rewards = [np.dot(mu_tilde, xvec) for xvec in contexts]
+        return random_argmax(self.estimated_rewards)
+
+    def observe_reward(self, arm_idx, reward):
+        context_vec = self.current_contexts[arm_idx]
+        self.contexts.append(context_vec)
+        self.rewards.append(reward)
+
+        X, y = np.asarray(self.contexts), np.asarray(self.rewards)
+        self.mu_hat, self.hess_inv = self._solve(X, y)
+        
+        # z = np.dot(X, self.mu_hat)
+        # s = expit(z)
+        # self.hess_inv = np.linalg.inv(np.dot(X.T * s * (1-s), X) +  np.eye(self.d) / self.v2)
+
+        sigma = expit(np.dot(self.mu_hat, context_vec))
+        self.B = self.B + np.outer(context_vec, context_vec) * sigma * (1-sigma)
