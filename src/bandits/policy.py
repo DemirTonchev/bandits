@@ -1,14 +1,14 @@
-from typing import List, Optional, Self, Protocol
+from typing import Optional, Self, Protocol
 from copy import deepcopy
 
 import numpy as np
-from functools import partial
 from numpy import linalg
 import math
 from scipy.special import expit  # noqa
 import scipy.optimize  # noqa
 
-from bandits.base import check_random_state, random_argmax, base_rng, softmax
+from bandits.base import check_random_state, random_argmax, softmax
+
 
 def safe_min_1d(array):
     """Useful for taking min arm index for some policies
@@ -453,10 +453,28 @@ class LinUCBSets:
 
 
 class LinThompsonSampling:
-    """This policy follows the algorithm of https://arxiv.org/pdf/1209.3352.pdf
+    """
+    LinThompsonSampling implements the Linear Thompson Sampling algorithm for contextual bandits.
+    This policy follows the algorithm described in the paper:
+    "Thompson Sampling for Contextual Bandits with Linear Payoffs" (https://arxiv.org/pdf/1209.3352.pdf).
+    Attributes:
+        k_arms (int): Number of arms.
+        d (int): Dimension of the context vectors.
+        v2 (float): Variance parameter for the prior distribution.
+        rng (np.random.RandomState): Random number generator.
+        B (np.ndarray): d x d matrix, initially set to identity matrix.
+        mu_hat (np.ndarray): d-dimensional vector, initially set to zero.
+        f (np.ndarray): d-dimensional vector, initially set to zero.
+        contexts (np.ndarray): Array to store context vectors for all arms.
+
+    Methods:
+        choose_action(contexts):
+            Chooses an action (arm) based on the current context vectors using Thompson Sampling.
+        observe_reward(arm_idx, reward):
+            Updates the model parameters based on the observed reward for the chosen arm.
     """
 
-    def __init__(self, k_arms, dimension, v2: float = 1., seed: int | None = None):
+    def __init__(self, k_arms: int, dimension: int, v2: float = 1., seed: int | None = None):
         self.k_arms = k_arms
         self.d = dimension
         self.v2 = v2
@@ -469,19 +487,8 @@ class LinThompsonSampling:
         # TODO covariance could be saved and updated on need bases and thus save on compute
         # self.covariances = None  # this is A_inv/B_inv
 
-    # @property
-    # def nu(self):
-    #     return 1
-    #     # return np.sqrt(9*self.dimension*np.log(self._t/self.delta))
-
     def _sample_mu(self, mean, covariance):
         return self.rng.multivariate_normal(mean, covariance)
-
-    # def _estimate_mean(self, theta_hat, context_vector, A):
-    #     estimated_reward = np.dot(self._sample_mu(theta_hat, np.linalg.inv(A)),
-    #                               context_vector)
-    #     print(estimated_reward)
-    #     return estimated_reward
 
     def choose_action(self, contexts):
         self.contexts = contexts  # save the state for the update/observe reward
@@ -500,8 +507,6 @@ class LinThompsonSampling:
         self.mu_hat = np.dot(np.linalg.inv(self.B), self.f)
 
 
-
-
 def logLikelihoodLogit(beta, X, y):
     z = np.dot(X, beta)
     y_hat = expit(z)
@@ -512,6 +517,7 @@ def logLikelihoodLogit_regularized(beta, X, y, tau_squared=1):
     z = np.dot(X, beta)
     y_hat = expit(z)
     return - (np.sum(y * np.log(y_hat) + (1 - y) * np.log(1 - y_hat))) + np.dot(beta, beta) / (2 * tau_squared)
+
 
 # gradient functions
 def likelihoodScore(beta, X, y):  # noqa
@@ -544,7 +550,7 @@ class LogThompsonSampling:
 
     def _sample_mu(self, mean, covariance):
         return self.rng.multivariate_normal(mean, covariance)
-    
+
     def _solve(self, X, y):
         optimLogit = scipy.optimize.minimize(
             logLikelihoodLogit_regularized,
@@ -573,10 +579,10 @@ class LogThompsonSampling:
 
         X, y = np.asarray(self.contexts), np.asarray(self.rewards)
         self.mu_hat, self.hess_inv = self._solve(X, y)
-        
+
         # z = np.dot(X, self.mu_hat)
         # s = expit(z)
         # self.hess_inv = np.linalg.inv(np.dot(X.T * s * (1-s), X) +  np.eye(self.d) / self.v2)
 
         sigma = expit(np.dot(self.mu_hat, context_vec))
-        self.B = self.B + np.outer(context_vec, context_vec) * sigma * (1-sigma)
+        self.B = self.B + np.outer(context_vec, context_vec) * sigma * (1 - sigma)
